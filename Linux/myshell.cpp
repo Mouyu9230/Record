@@ -10,7 +10,9 @@ using namespace std;
 //思路：先基于管道符把输入分段，解析每段命令用结构体存信息以处理重定向，依次执行，特殊处理cd，关键在于对端口的设定
 //基础版：
 
-void command_analyse();
+void command_analyse(string s){
+    
+}
 
 int main(){
     while(1){
