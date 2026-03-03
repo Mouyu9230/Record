@@ -10,7 +10,45 @@ using namespace std;
 //思路：先基于管道符把输入分段，解析每段命令用结构体存信息以处理重定向，依次执行，特殊处理cd，关键在于对端口的设定
 //基础版：
 
-void command_analyse(string s){
+vector<string> system_commands={"ls","cat"};
+
+typedef struct command{
+
+    string basic_command;
+    string input_from;
+    string output_to;
+
+}command;
+
+command command_analyse(string s){//施工中---------------------
+    command com={"","",""};
+    int findflag=0;
+    for(auto x:s){
+        if(x=='>'||x=='<'){
+            findflag=1;
+        }
+    }
+    if(findflag==0)com.basic_command=s;
+
+}
+
+void command_cut(string s,vector<string>& v){
+    int fastflag=-1;
+    int slowflag=0;
+    int vcount=0;
+    for(auto& x:s){
+        fastflag++;
+        if(x=='|'){
+            for(int i=slowflag;i<fastflag;i++){
+                v[vcount].push_back(s[i]);
+            }
+            vcount++;
+            slowflag=fastflag+1;
+        }
+    }//pushback空格以处理||情况？
+    for(int i=slowflag;i<=fastflag;i++){
+            v[vcount].push_back(s[i]);
+    }
     
 }
 
