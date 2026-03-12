@@ -1,38 +1,64 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
-#include <string>
+                                                          
 #include <unistd.h>//基础
 #include <sys/wait.h>//wait
 
 using namespace std;
 
-//思路：先基于管道符把输入分段，解析每段命令用结构体存信息以处理重定向，依次执行，特殊处理cd，关键在于对端口的设定
-//基础版：
 
-vector<string> system_commands={"ls","cat"};
+vector<string> system_commands={"ls","cat"};//施工中：后续把输入判断做成遍历这个vector
 
 typedef struct command{
 
-    string basic_command;
+    vector<string> basic_command;
     string input_from;
     string output_to;
+    vector<string> cd_command;
+    bool plus=false;//>>
+    bool run_in_back=false;//&
 
 }command;
 
-command command_analyse(string s){//施工中---------------------
-    command com={"","",""};
-    int findflag=0;
-    for(auto x:s){
-        if(x=='>'||x=='<'){
-            findflag=1;
+void command_analyse(vector<string> v,command &com){
+    for(size_t i=0;i<v.size();i++){
+        if(v[0]=="cd"){
+            com.cd_command.push_back(v[i]);
+            continue;
+        }
+        if(v[i]=="<"){
+            if(i+1<v.size()){
+                com.input_from=v[i+1];
+                i++;
+            }
+        }
+        else if(v[i]==">"){
+            if(i+1<v.size()){
+                com.output_to=v[i+1];
+                com.plus=false;
+                i++;
+            }
+        }
+        else if(v[i]==">>"){
+            if(i+1<v.size()){
+                com.output_to=v[i+1];
+                com.plus=true;
+                i++;
+            }
+        }
+        else if(v[i]=="&"){
+            com.run_in_back=true;
+        }
+        else{
+            com.basic_command.push_back(v[i]);
         }
     }
-    if(findflag==0)com.basic_command=s;
+
 
 }
 
-void command_cut(string s,vector<string>& v){
+void command_cut(string s,vector<string>& v){//越界问题？
     int fastflag=-1;
     int slowflag=0;
     int vcount=0;
@@ -52,8 +78,20 @@ void command_cut(string s,vector<string>& v){
     
 }
 
+void command_iss(vector<string> v,vector<vector<string>>& for_analyse){//施工中：越界风险？
+
+    string atom;
+    int size=v.size();
+    for(int i=0;i<size;i++){
+        istringstream iss(v[i]);
+        while(iss>>atom)for_analyse[i].push_back(atom);
+    }
+}//略过空格
+
 int main(){
     while(1){
+        int wrong_command_flag=0;//判断未定义输入
+
         cout<<"myshell> "<<endl;
         string line;
         getline(cin,line);
@@ -64,39 +102,42 @@ int main(){
             break;
         }
 
-        istringstream iss(line);
-        vector<string>vargv;
-        string temp;
+        vector<string> cutted;//依管道符切割结果
+        vector<vector<string>> for_analyze;//解析cutted
+        vector<command> analyzed_commands;//解析每个vector为command以处理重定义
+
+        command_cut(line,cutted);
+        int pipe_num=cutted.size()-1;
+        command_iss(cutted,for_analyze);
+
+        for(auto x:for_analyze){
+            command com;
+            command_analyse(x,com);
+            analyzed_commands.push_back(com);
+        }
+
+        for(auto x:analyzed_commands){
+            if(x.basic_command.empty()){
+                cout<<"basic command empty"<<endl;
+                wrong_command_flag=1;
+            }
+            if(x.basic_command[0]!="ls"&&x.basic_command[0]!="cat"){
+            cout<<"an unknown command"<<endl;
+            wrong_command_flag=1;
+            break;
+            }
+        }
+        if(wrong_command_flag==1)continue;//判断未定义输入
+
+        vector<char*> cform_commands;//转c风格施工中---------------------------
+
         
-        while(iss>>temp){
-            vargv.push_back(temp);
-        }
-        if(vargv.empty())continue;
+        
 
-        if(vargv[0]!="ls"&&vargv[0]!="cat"){
-            cout<<"unknown command"<<endl;
-            continue;
-        }
 
-        //转化为char*
-        vector<char*>argv;
-        for(auto& x:vargv){
-            argv.push_back(const_cast<char*>(x.c_str()));//转换为const char*再去掉const
-        }
-        argv.push_back(nullptr);
 
-        pid_t pid=fork();
-        if(pid<0){
-            cout<<"error when fork"<<endl;
-            continue;
-        }
-        if(pid==0){
-            execvp(argv[0],argv.data());//如果成功则不会返回;vec.data()是指向首元素指针，适配c风格的接口
-            cout<<"error when exec"<<endl;
-            _exit(1);
-        }else{
-            waitpid(pid,nullptr,0);
-        }
+        
+        
     }
     return 0;
 
