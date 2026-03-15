@@ -7,13 +7,13 @@
 
 using namespace std;
 
-//问题：输入cd -返回错误，即使切换过目录
-//无法./
 //还没做防终止信号
 
 
 
 vector<string> system_commands={"ls","cat","echo","mkdir","wc","grep","tac","pwd","rm","cp","mv","touch","chmod"};
+char old_wd[256];
+char cur_wd[256];
 
 typedef struct command{
 
@@ -23,11 +23,17 @@ typedef struct command{
     vector<string> cd_command;
     bool plus=false;//>>
     bool run_in_back=false;//&
+    bool is_path=false;// ./
 
 }command;
 
 void command_analyse(vector<string> v,command &com){
     for(size_t i=0;i<v.size();i++){
+
+        if((v[i][0]=='.'&&v[i][1]=='/')||v[i][0]=='/'){
+            com.is_path=true;
+        }
+
         if(v[0]=="cd"){
             com.cd_command.push_back(v[i]);
             continue;
@@ -93,8 +99,13 @@ int main(){
     while(1){
         int wrong_command_flag=0;//判断未定义输入
         int command_find_flag=0;//遍历system_commmand，检查指令是否支持
+        int old_dir_flag=0;//若输入为cd -，跳过正常cd失败检验
 
-        cout<<"myshell> ";
+        getcwd(cur_wd,256);
+        cout<<"myshell>:";
+        string cppwd(cur_wd);
+        cout<<cppwd<<"$ ";
+
         string line;
         if(!getline(cin,line)){
             break;
@@ -122,17 +133,29 @@ int main(){
         }
 
         if(analyzed_commands.size()==1&&!analyzed_commands[0].cd_command.empty()){
+
+
+            if(analyzed_commands[0].cd_command[1]=="-"){
+                if(chdir(old_wd)!=0){
+                    cout<<"error when change to prev dir,you may cd to anywhere first"<<endl;
+                }
+                old_dir_flag=1;
+            }
+            getcwd(old_wd,256);
+
             if(analyzed_commands[0].cd_command.size()<2){
                 cout<<"...cd to where?"<<endl;
             }else{
 
-                if(chdir(analyzed_commands[0].cd_command[1].c_str())!=0){
+                if(chdir(analyzed_commands[0].cd_command[1].c_str())!=0&&!old_dir_flag){
                     cout<<"error when cd"<<endl;
                 }
 
             }
             continue;
         }//特殊处理cd
+
+        
 
         
 
@@ -148,7 +171,7 @@ int main(){
                 }
             }
 
-            if(!command_find_flag){
+            if(!command_find_flag&&!x.is_path){//若输入文件路径，跳过检验
             cout<<"an unknown command"<<endl;
             wrong_command_flag=1;
             break;
