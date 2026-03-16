@@ -1,13 +1,13 @@
-#include <iostream>
-#include <sstream>
-#include <vector>
-#include <fcntl.h>                                               
-#include <unistd.h>//基础
-#include <sys/wait.h>//wait
+#include<iostream>
+#include<sstream>
+#include<vector>
+#include<fcntl.h>                                               
+#include<unistd.h>//基础
+#include<sys/wait.h>//wait
+#include<signal.h>
 
 using namespace std;
 
-//还没做防终止信号
 
 
 
@@ -95,20 +95,30 @@ void command_iss(vector<string> v,vector<vector<string>>& for_analyse){//施工�
     }
 }//略过空格
 
+void sigint_handler(int x){
+
+    write(STDOUT_FILENO,"\nreceived a SIGINT!\n",21);
+
+}
+
 int main(){
+
+    signal(SIGINT,sigint_handler);
+
     while(1){
         int wrong_command_flag=0;//判断未定义输入
         int command_find_flag=0;//遍历system_commmand，检查指令是否支持
         int old_dir_flag=0;//若输入为cd -，跳过正常cd失败检验
 
         getcwd(cur_wd,256);
-        cout<<"myshell>:";
+        cout<<"\033[32mmyshell>\033[0m"<<":";
         string cppwd(cur_wd);
-        cout<<cppwd<<"$ ";
+        cout<<"\033[34m"<<cppwd<<"\033[0m"<<"$ ";
 
         string line;
         if(!getline(cin,line)){
-            break;
+                cin.clear();
+                continue;
         }
         
         if(line.empty()){
@@ -203,6 +213,8 @@ int main(){
                 break;
             }
             if(pid==0){//子进程部分
+
+                signal(SIGINT, SIG_DFL);
 
                 if(!analyzed_commands[i].input_from.empty()){//处理<
                     int in_fd=open(analyzed_commands[i].input_from.c_str(),O_RDONLY);
