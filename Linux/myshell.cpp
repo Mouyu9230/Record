@@ -5,15 +5,22 @@
 #include<unistd.h>//基础
 #include<sys/wait.h>//wait
 #include<signal.h>
+#include<string.h>
 
 using namespace std;
 
 
+//3.16 验收后更正版本
+//在验收时遇到了连续使用cd -无法正确回退的问题
+//原因在于cd处理模块中存在错误逻辑，使得内部getcwd在判断输入为cd -并正确完成目录回退后依然被调用，使得old_wd无法正确存储回退前路径从而导致后续回退失败。
+//解决方式：利用额外的cur_wd在每次循环开始时获取wd,并在完成回退时strcpy到old_wd来正确存储路径，并对原来出问题的getcwd加上if判断使其在cd -时不起效
+//cd处理模块：152-180
 
 
 vector<string> system_commands={"ls","cat","echo","mkdir","wc","grep","tac","pwd","rm","cp","mv","touch","chmod"};
 char old_wd[256];
 char cur_wd[256];
+
 
 typedef struct command{
 
@@ -146,20 +153,27 @@ int main(){
 
 
             if(analyzed_commands[0].cd_command[1]=="-"){
+
                 if(chdir(old_wd)!=0){
                     cout<<"error when change to prev dir,you may cd to anywhere first"<<endl;
                 }
                 old_dir_flag=1;
+                strcpy(old_wd,cur_wd);//3.16 增添
             }
-            getcwd(old_wd,256);
 
+            if(!old_dir_flag){//if 3.16增添
+                getcwd(old_wd,256);
+            }
             if(analyzed_commands[0].cd_command.size()<2){
                 cout<<"...cd to where?"<<endl;
             }else{
 
-                if(chdir(analyzed_commands[0].cd_command[1].c_str())!=0&&!old_dir_flag){
+                if(!old_dir_flag){
+                if(chdir(analyzed_commands[0].cd_command[1].c_str())!=0){
                     cout<<"error when cd"<<endl;
                 }
+                }
+
 
             }
             continue;
