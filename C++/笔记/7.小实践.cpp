@@ -5,7 +5,7 @@
 using namespace std;
 
 class user{
-    private:
+    private:                                               
     string name;
     long long int account;
     double money;
