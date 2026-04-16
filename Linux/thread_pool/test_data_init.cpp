@@ -3,7 +3,7 @@
 int main(){
 
     std::random_device rd;              // 真随机种子
-    std::mt19937 gen(rd());    
+    std::mt19937 gen(rd());     
 
     std::uniform_int_distribution<int> dist(1,20);
 

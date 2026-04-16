@@ -95,7 +95,7 @@ void worker(thread_pool* pool){
                 return pool->stop_me||!pool->task.empty();
             });
 
-            if (pool->stop_me&& pool->task.empty())
+            if (pool->stop_me&&pool->task.empty())
                 return;
 
             n=pool->task.front();
