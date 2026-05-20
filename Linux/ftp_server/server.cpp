@@ -146,6 +146,7 @@ int handle_command(ftp_session* sess, const string& cmd)
         handle_pass(sess,cmds[1]);
     }else if(cmds[0]=="QUIT"){
         handle_quit(sess);
+        cout<<"[SERVER] quiting.."<<endl;
         return 1;
     }else{
         send_response(sess->ctrl_fd,"500 Unknown command");
