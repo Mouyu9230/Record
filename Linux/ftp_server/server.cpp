@@ -294,8 +294,7 @@ int create_server_socket(int port){
 void send_response(int fd, const string& msg){
     string real_msg=msg;
 
-    if(real_msg.size()<2||real_msg.substr(real_msg.size()-2)!="\r\n")
-    {
+    if(real_msg.size()<2||real_msg.substr(real_msg.size()-2)!="\r\n"){
         real_msg+="\r\n";
     }
 
