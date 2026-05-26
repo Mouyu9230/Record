@@ -202,6 +202,69 @@ int handle_command(ftp_client* cli, const string& cmd)
 
 void handle_pasv(ftp_client* cli){
 
+    int data_port;
+    string resp;
+
+    string cmd="PASV";
+    send_cmd(cli, cmd);
+    resp=recv_resp(cli);
+    cout<<resp;
+
+//------------------------------解析
+    //查找括号
+    int left=resp.find('(');
+    int right=resp.find(')');
+
+    if(left==string::npos||right==string::npos){
+        cout<<"[CLIENT] invalid PASV response"<<endl;
+        return;
+    }
+
+    string data=resp.substr(left+1,right-left-1);
+
+    stringstream ss(data);
+    string cut;
+    vector<int> nums;
+
+    while(getline(ss,cut,',')){
+        nums.push_back(stoi(cut));
+    }
+
+    if(nums.size()!=6){
+        cout<<"[CLIENT] invalid PASV data"<<endl;
+        return;
+    }
+    data_port=nums[4]*256+nums[5];
+//----------------------------------
+
+
+    cli->data_fd=socket(AF_INET, SOCK_STREAM, 0);
+    if(cli->data_fd<0){
+        cout<<"[CLIENT] failed to create socket"<<endl;
+        return;
+    }
+    sockaddr_in server_addr;
+    memset(&server_addr, 0, sizeof(server_addr));
+
+    server_addr.sin_family=AF_INET;
+    server_addr.sin_port=htons(data_port);
+
+    if(inet_pton(AF_INET,cli->server_ip.c_str(),&server_addr.sin_addr)<=0){
+        cout<<"[CLIENT] invalid server ip"<<endl;
+        close(cli->data_fd);
+        return;
+    }
+
+    if(connect(cli->data_fd,(sockaddr*)&server_addr,sizeof(server_addr))<0){
+        cout<<"[CLIENT] failed to connect server"<<endl;
+        close(cli->data_fd);
+        return;
+    }
+
+    cout<<"[CLIENT] server entered PASV "<<endl;
+
+    return;
+
 }
 void handle_list(ftp_client* cli){
 

@@ -242,8 +242,7 @@ void handle_pasv(ftp_session* sess)
 }
 
 
-void handle_list(ftp_session* sess)
-{
+void handle_list(ftp_session* sess){
     
 }
 
