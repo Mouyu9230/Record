@@ -14,6 +14,8 @@
 
 #define SERVER_PORT 2100
 #define BUF_SIZE 4096
+#define CLIENT_NAME "1";
+#define CLIENT_PASS "1";
 
 // FTP session状态
 typedef struct
@@ -146,7 +148,6 @@ int handle_command(ftp_session* sess, const string& cmd)
         handle_pass(sess,cmds[1]);
     }else if(cmds[0]=="QUIT"){
         handle_quit(sess);
-        cout<<"[SERVER] quiting.."<<endl;
         return 1;
     }else{
         send_response(sess->ctrl_fd,"500 Unknown command");
@@ -160,15 +161,16 @@ int handle_command(ftp_session* sess, const string& cmd)
 
 void handle_user(ftp_session* sess, const string& arg)
 {
-    if(arg!="Mouyu"){
+    if(arg!="CLIENT_NAME"){
         send_response(sess->ctrl_fd,"530 Wrong username\r\n");
         return;
     }else{
-        send_response(sess->ctrl_fd,"331 Username correct,password required\r\n");       
+        send_response(sess->ctrl_fd,"331 Username correct,password required\r\n"); 
+        sess->is_right_user=true;      
         return;   
     }
 
-    sess->is_right_user=true;
+
 }
 
 void handle_pass(ftp_session* sess, const string& arg){
@@ -176,7 +178,7 @@ void handle_pass(ftp_session* sess, const string& arg){
         send_response(sess->ctrl_fd,"530 No username\r\n");
         return;      
     }
-    if(arg!="123456"){
+    if(arg!="CLIENT_PASS"){
         send_response(sess->ctrl_fd,"530 Wrong password\r\n");   
         return;
     }
@@ -243,19 +245,112 @@ void handle_pasv(ftp_session* sess)
 
 
 void handle_list(ftp_session* sess){
-    
+
+    if(!sess->is_login){
+        send_response(sess->ctrl_fd,"530 login first");
+        return;
+    }
+    if(sess->data_listen_fd<0){
+        send_response(sess->ctrl_fd,"425 enter PASV first");
+        return;
+    }
+
+    send_response(sess->ctrl_fd,"150 Opening ASCII mode data connection for file list");//?
+
+    sess->data_fd=accept(sess->data_listen_fd,nullptr,nullptr);
+
+    if(sess->data_fd<0){
+
+        send_response(sess->ctrl_fd,"425 Data connection failed");
+
+        close(sess->data_listen_fd);
+        sess->data_listen_fd=-1;
+        return;
+    }
+    DIR* dir=opendir("test");
+
+    if(dir==nullptr){
+        send_response(sess->ctrl_fd,"550 Failed to open directory");
+        close(sess->data_fd);
+        close(sess->data_listen_fd);
+        sess->data_fd=-1;
+        sess->data_listen_fd=-1;
+        return;
+    }
+
+    dirent* entry;
+    string list_data;
+
+    //遍历
+    while((entry=readdir(dir))!=nullptr){
+        list_data+=entry->d_name;
+        list_data+="\r\n";
+    }
+
+    closedir(dir);
+
+    send(sess->data_fd,list_data.c_str(),list_data.size(),0);
+
+    close(sess->data_fd);
+    close(sess->data_listen_fd);
+
+    sess->data_fd=-1;
+    sess->data_listen_fd=-1;
+
+
+    send_response(sess->ctrl_fd,"226 Directory send OK");
+
 }
 
 
-void handle_retr(ftp_session* sess, const string& file)
-{
-    
+void handle_retr(ftp_session* sess, const string& file){
+
+    if(!sess->is_login){
+        send_response(sess->ctrl_fd,"530 login first");
+        return;
+    }
+    if(sess->data_fd<0){
+        send_response(sess->ctrl_fd,"425 enter PASV first");
+        return;
+    }
+    send_response(sess->ctrl_fd,"150 Opening ASCII mode data connection for file list");//待更改
+
+    sess->data_fd=accept(sess->data_listen_fd,nullptr,nullptr);
+
+    if(sess->data_fd<0){
+
+        send_response(sess->ctrl_fd,"425 Data connection failed");
+
+        close(sess->data_listen_fd);
+        sess->data_listen_fd=-1;
+        return;
+    }
 }
 
 
-void handle_stor(ftp_session* sess, const string& file)
-{
-    
+void handle_stor(ftp_session* sess, const string& file){
+
+    if(!sess->is_login){
+        send_response(sess->ctrl_fd,"530 login first");
+        return;
+    }
+    if(sess->data_fd<0){
+        send_response(sess->ctrl_fd,"425 enter PASV first");
+        return;
+    }
+    send_response(sess->ctrl_fd,"150 Opening ASCII mode data connection for file list");//待更改
+
+    sess->data_fd=accept(sess->data_listen_fd,nullptr,nullptr);
+
+    if(sess->data_fd<0){
+
+        send_response(sess->ctrl_fd,"425 Data connection failed");
+
+        close(sess->data_listen_fd);
+        sess->data_listen_fd=-1;
+        return;
+    }
+
 }
 
 

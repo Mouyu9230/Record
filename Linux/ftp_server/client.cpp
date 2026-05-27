@@ -1,4 +1,5 @@
 #include <iostream>
+#include <ostream>
 #include <vector>
 #include <string>
 #include <cstring>
@@ -11,6 +12,7 @@ using namespace std;
 
 #define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 2100
+
 
 #define BUF_SIZE 4096
 
@@ -123,7 +125,7 @@ string recv_resp(ftp_client* cli){
     if(n<=0){
         return "[CLIENT] server disconnected\r\n";
     }
-
+    
     //转成string返回
     return string(buf);
 }
@@ -268,6 +270,42 @@ void handle_pasv(ftp_client* cli){
 }
 void handle_list(ftp_client* cli){
 
+    string cmd="LIST";
+    send_cmd(cli,cmd);
+
+    string resp=recv_resp(cli);
+    cout<<resp;
+
+    if(resp.substr(0,3)!="150"){
+        close(cli->data_fd);
+        cli->data_fd=-1;
+        return;
+    }
+
+    char buf[BUF_SIZE];
+    memset(buf,0,sizeof(buf));
+
+    int n;
+
+    cout<<"FILE LIST"<<endl;
+    cout<<"--------------------"<<endl;
+
+    while((n=recv(cli->data_fd,buf,sizeof(buf)-1,0))>0){
+        buf[n]='\0';
+        cout<<buf;
+        memset(buf,0,sizeof(buf));
+    }
+
+    cout<<"--------------------"<<endl;
+
+    close(cli->data_fd);
+    cli->data_fd=-1;
+
+
+    cout<<recv_resp(cli);
+
+
+    
 }
 void handle_retr(ftp_client* cli, const std::string& file){
 
