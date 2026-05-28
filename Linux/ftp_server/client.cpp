@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 using namespace std;
 
@@ -308,7 +310,50 @@ void handle_list(ftp_client* cli){
     
 }
 void handle_retr(ftp_client* cli, const std::string& file){
+    string cmd="RETR "+file;
+    send_cmd(cli,cmd);
 
+    string resp=recv_resp(cli);
+    cout<<resp;
+
+    if(resp.substr(0,3)!="150"){
+        close(cli->data_fd);
+        cli->data_fd=-1;
+        return;
+    }
+
+    string path="test/cli"+file;
+
+    int fd=open(path.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0666);
+
+    if(fd<0){
+        cout<<"[CLIENT] failed to create local file"<<endl;
+
+        close(cli->data_fd);
+        cli->data_fd=-1;
+        return;
+    }
+
+    //接收文件数据
+    char buf[BUF_SIZE];
+    int n;
+
+    cout<<"[CLIENT] downloading..."<<endl;
+
+    while((n=recv(cli->data_fd,buf,sizeof(buf),0))>0){
+
+        write(fd,buf,n);
+    }
+
+    cout<<"[CLIENT] download complete"<<endl;
+
+    close(fd);
+
+    //关闭数据连接
+    close(cli->data_fd);
+    cli->data_fd=-1;
+
+    cout<<recv_resp(cli);
 }
 void handle_stor(ftp_client* cli, const std::string& file){
     

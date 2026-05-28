@@ -14,8 +14,8 @@
 
 #define SERVER_PORT 2100
 #define BUF_SIZE 4096
-#define CLIENT_NAME "1";
-#define CLIENT_PASS "1";
+#define CLIENT_NAME "1"
+#define CLIENT_PASS "1"
 
 // FTP session状态
 typedef struct
@@ -57,13 +57,20 @@ int main()
 
     cout << "[SERVER] Listening on 2100..." << endl;
 
-    while(1){
-        int client_fd=accept(server_fd, nullptr, nullptr);//监听柄完成与2100bind并listen等待connect,accept拿出一个握完手的连接，生成连接柄
+while(1){
 
-        thread t(client_handler, client_fd);
-        t.detach();
+    int client_fd=accept(server_fd,nullptr,nullptr);
+
+    // accept失败
+    if(client_fd<0){
+
+        cout<<"[SERVER] accept failed"<<endl;
+        continue;
     }
 
+    thread t(client_handler, client_fd);
+    t.detach();
+}
     return 0;
 }
 
@@ -71,6 +78,8 @@ int main()
 void client_handler(int client_fd)
 {
     ftp_session sess;
+    sess.data_fd=-1;
+    sess.data_listen_fd=-1;
     memset(&sess, 0, sizeof(sess));
     sess.ctrl_fd=client_fd;
 
@@ -161,7 +170,7 @@ int handle_command(ftp_session* sess, const string& cmd)
 
 void handle_user(ftp_session* sess, const string& arg)
 {
-    if(arg!="CLIENT_NAME"){
+    if(arg!=CLIENT_NAME){
         send_response(sess->ctrl_fd,"530 Wrong username\r\n");
         return;
     }else{
@@ -178,7 +187,7 @@ void handle_pass(ftp_session* sess, const string& arg){
         send_response(sess->ctrl_fd,"530 No username\r\n");
         return;      
     }
-    if(arg!="CLIENT_PASS"){
+    if(arg!=CLIENT_PASS){
         send_response(sess->ctrl_fd,"530 Wrong password\r\n");   
         return;
     }
@@ -309,22 +318,52 @@ void handle_retr(ftp_session* sess, const string& file){
         send_response(sess->ctrl_fd,"530 login first");
         return;
     }
-    if(sess->data_fd<0){
+    if(sess->data_listen_fd<0){
         send_response(sess->ctrl_fd,"425 enter PASV first");
         return;
     }
-    send_response(sess->ctrl_fd,"150 Opening ASCII mode data connection for file list");//待更改
+
+    //打开文件
+    string path="test/"+file;
+    int fd=open(path.c_str(),O_RDONLY);
+
+    if(fd<0){
+        send_response(sess->ctrl_fd,"550 Failed to open file");
+        close(sess->data_listen_fd);
+        sess->data_listen_fd=-1;
+        return;
+    }
+
+    send_response(sess->ctrl_fd,"150 Opening binary mode data connection");//待更改
 
     sess->data_fd=accept(sess->data_listen_fd,nullptr,nullptr);
 
     if(sess->data_fd<0){
 
         send_response(sess->ctrl_fd,"425 Data connection failed");
-
+        close(fd);
         close(sess->data_listen_fd);
         sess->data_listen_fd=-1;
         return;
     }
+    char buf[BUF_SIZE];
+    int n;
+
+    while((n=read(fd,buf,sizeof(buf)))>0){
+
+        send(sess->data_fd,buf,n,0);
+    }
+
+    close(fd);
+
+    //关闭数据连接
+    close(sess->data_fd);
+    close(sess->data_listen_fd);
+
+    sess->data_fd=-1;
+    sess->data_listen_fd=-1;
+
+    send_response(sess->ctrl_fd,"226 Transfer complete");
 }
 
 
