@@ -322,7 +322,7 @@ void handle_retr(ftp_client* cli, const std::string& file){
         return;
     }
 
-    string path="test/cli"+file;
+    string path="test_cli/cli_retr_"+file;
 
     int fd=open(path.c_str(),O_WRONLY|O_CREAT|O_TRUNC,0666);
 
@@ -341,7 +341,6 @@ void handle_retr(ftp_client* cli, const std::string& file){
     cout<<"[CLIENT] downloading..."<<endl;
 
     while((n=recv(cli->data_fd,buf,sizeof(buf),0))>0){
-
         write(fd,buf,n);
     }
 
@@ -355,7 +354,46 @@ void handle_retr(ftp_client* cli, const std::string& file){
 
     cout<<recv_resp(cli);
 }
-void handle_stor(ftp_client* cli, const std::string& file){
-    
+void handle_stor(ftp_client* cli, const string& file){
+
+    string path="test_cli/"+file;
+
+    int fd=open(path.c_str(), O_RDONLY);
+
+    if(fd<0){
+        cout<<"[CLIENT] local file not found"<<endl;
+        return;
+    }
+
+    string cmd="STOR "+file;
+    send_cmd(cli,cmd);
+
+    string resp=recv_resp(cli);
+    cout<<resp;
+
+    if(resp.substr(0,3)!="150"){
+        close(fd);
+        close(cli->data_fd);
+        cli->data_fd=-1;
+
+        return;
+    }
+
+    char buf[BUF_SIZE];
+    int n;
+
+    cout<<"[CLIENT] uploading..."<<endl;
+
+    while((n=read(fd,buf,sizeof(buf)))>0){
+        send(cli->data_fd, buf, n, 0);
+    }
+
+    close(fd);
+    close(cli->data_fd);
+    cli->data_fd=-1;
+
+    cout<<"[CLIENT] upload complete"<<endl;
+
+    cout<<recv_resp(cli);
 }
 

@@ -1,10 +1,11 @@
+#include <csignal>
 #include <iostream>
 #include <string>
 #include <cstring>
 #include <thread>
 #include <vector>
 #include <sstream>
-
+#include <signal.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -49,38 +50,54 @@ void handle_pasv(ftp_session* sess);
 void handle_list(ftp_session* sess);
 void handle_retr(ftp_session* sess, const string& file);
 void handle_stor(ftp_session* sess, const string& file);
+void sigint_handler(int x);
 
+volatile sig_atomic_t running=1;
+int g_server_fd=-1;
 
 int main()
 {
+    signal(SIGINT,sigint_handler);
     int server_fd=create_server_socket(SERVER_PORT);//控制连接监听柄
-
+    g_server_fd=server_fd;
     cout << "[SERVER] Listening on 2100..." << endl;
 
-while(1){
+while(running){
 
     int client_fd=accept(server_fd,nullptr,nullptr);
 
     // accept失败
     if(client_fd<0){
+        if(!running){
+            break;
+        }
 
-        cout<<"[SERVER] accept failed"<<endl;
+        cout<<"[SERVER] accept failed"<<strerror(errno)<<endl;
         continue;
     }
 
     thread t(client_handler, client_fd);
     t.detach();
 }
+    cout<<"[SERVER] shutting down..."<<endl;
     return 0;
+}
+
+void sigint_handler(int){
+    running=0;
+    if(g_server_fd>=0){
+        close(g_server_fd);
+    }
 }
 
 //客户端会话线程handler
 void client_handler(int client_fd)
 {
     ftp_session sess;
+    memset(&sess, 0, sizeof(sess));
     sess.data_fd=-1;
     sess.data_listen_fd=-1;
-    memset(&sess, 0, sizeof(sess));
+
     sess.ctrl_fd=client_fd;
 
     send_response(client_fd,"220 FTP server ready");
@@ -198,7 +215,6 @@ void handle_pass(ftp_session* sess, const string& arg){
 void handle_quit(ftp_session* sess){
 
     send_response(sess->ctrl_fd,"221 Bye");
-    close(sess->ctrl_fd);
     close(sess->data_fd);
     close(sess->data_listen_fd);
 
@@ -276,7 +292,7 @@ void handle_list(ftp_session* sess){
         sess->data_listen_fd=-1;
         return;
     }
-    DIR* dir=opendir("test");
+    DIR* dir=opendir("test_svr");
 
     if(dir==nullptr){
         send_response(sess->ctrl_fd,"550 Failed to open directory");
@@ -324,7 +340,7 @@ void handle_retr(ftp_session* sess, const string& file){
     }
 
     //打开文件
-    string path="test/"+file;
+    string path="test_svr/"+file;
     int fd=open(path.c_str(),O_RDONLY);
 
     if(fd<0){
@@ -373,22 +389,51 @@ void handle_stor(ftp_session* sess, const string& file){
         send_response(sess->ctrl_fd,"530 login first");
         return;
     }
-    if(sess->data_fd<0){
+
+    if(sess->data_listen_fd < 0){
         send_response(sess->ctrl_fd,"425 enter PASV first");
         return;
     }
-    send_response(sess->ctrl_fd,"150 Opening ASCII mode data connection for file list");//待更改
+
+    string path="test_svr/svr_stor_"+file;
+
+    int fd=open(path.c_str(),O_WRONLY | O_CREAT | O_TRUNC,0666);
+
+    if(fd<0){
+        send_response(sess->ctrl_fd,"550 Failed to create file");
+        close(sess->data_listen_fd);
+        sess->data_listen_fd = -1;
+        return;
+    }
+
+    send_response(sess->ctrl_fd,"150 Opening binary mode data connection");
 
     sess->data_fd=accept(sess->data_listen_fd,nullptr,nullptr);
 
     if(sess->data_fd<0){
 
         send_response(sess->ctrl_fd,"425 Data connection failed");
-
+        close(fd);
         close(sess->data_listen_fd);
-        sess->data_listen_fd=-1;
+        sess->data_listen_fd = -1;
         return;
     }
+
+    char buf[BUF_SIZE];
+    int n;
+
+    while((n=recv(sess->data_fd,buf,sizeof(buf),0))>0){
+        write(fd, buf, n);
+    }
+
+    close(fd);
+    close(sess->data_fd);
+    close(sess->data_listen_fd);
+
+    sess->data_fd=-1;
+    sess->data_listen_fd=-1;
+
+    send_response(sess->ctrl_fd,"226 Transfer complete");
 
 }
 
@@ -405,6 +450,13 @@ int create_server_socket(int port){
     int server_fd=socket(AF_INET,SOCK_STREAM,0);//IPV4,流式
     if(server_fd==-1){
         cout<<"[SERVER] failed to create socket"<<endl;
+        return -1;
+    }
+
+    int opt=1;
+    if(setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0){
+        perror("setsockopt failed");
+        close(server_fd);
         return -1;
     }
 
