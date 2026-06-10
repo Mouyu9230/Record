@@ -1,42 +1,4 @@
-#include <iostream>
-#include <ostream>
-#include <vector>
-#include <string>
-#include <cstring>
-#include <sstream>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <fcntl.h>
-#include <unistd.h>
-
-using namespace std;
-
-#define SERVER_IP "127.0.0.1"
-#define SERVER_PORT 2100
-
-
-#define BUF_SIZE 4096
-
-struct ftp_client
-{
-    int ctrl_fd;
-    int data_fd;
-    std::string server_ip;
-    int server_port;
-    bool is_login;
-};
-
-int connect_server(ftp_client* cli);
-
-void send_cmd(ftp_client* cli, const std::string& cmd);
-string recv_resp(ftp_client* cli);
-int handle_command(ftp_client* cli, const string& cmd);
-
-void handle_pasv(ftp_client* cli);
-void handle_list(ftp_client* cli);
-void handle_retr(ftp_client* cli, const std::string& file);
-void handle_stor(ftp_client* cli, const std::string& file);
+#include "client.h"
 
 
 int main(){
