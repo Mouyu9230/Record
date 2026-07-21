@@ -1,6 +1,5 @@
 #include <iostream>
 #include <queue>
-#include <cmath>
 #include <thread>
 #include <vector>
 #include <condition_variable>
@@ -63,7 +62,7 @@ void get_task(thread_pool* pool,atomic<int>& submitted){
     ifstream ifs("test_data.txt");
     if(!ifs.is_open()){
         cout<<"file open failed\n";
-        return;
+        return; 
     }
 
     int task;
